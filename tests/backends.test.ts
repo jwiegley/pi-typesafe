@@ -367,7 +367,7 @@ test("resolveBackend resolves registry names to the registry entries", () => {
   assert.equal(commandcode.modelsIdField, "id");
   assert.equal(commandcode.defaultModel, "typesafe/jev");
   assert.equal(commandcode.modelsVerifyKey, false);
-  assert.deepEqual(resolveBackend("openrouter").defaultModel, "typesafe/jev-1.13");
+  assert.deepEqual(resolveBackend("openrouter").defaultModel, "~typesafe/jev-latest", "OpenRouter follows Jev latest through its alias, as TypeSafe does");
 });
 
 test("backendHost reports the destination host", () => {

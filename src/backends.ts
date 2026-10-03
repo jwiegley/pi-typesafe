@@ -97,10 +97,10 @@ export function backendConfig(name: TypeSafeBackend): RegistryBackendConfig {
   return backend;
 }
 
-/** Each backend's default model id as the caller writes it, before mapping: OpenRouter pins a version, TypeSafe follows latest. */
+/** Each backend's default model id as the caller writes it, before mapping: TypeSafe and OpenRouter follow Jev latest (OpenRouter sends its alias form), while Command Code and Liquid name their own ids. */
 const DEFAULT_MODEL: Record<TypeSafeBackend, string> = {
   typesafe: "jev-latest",
-  openrouter: "typesafe/jev-1.13",
+  openrouter: "jev-latest",
   commandcode: "typesafe/jev",
   liquid: "d1:free",
 };
