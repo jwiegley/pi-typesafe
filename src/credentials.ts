@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { DEFAULT_BACKEND, TYPESAFE_KEY_ENV, resolveBackend } from "./backends.js";
 import type { BackendSpec } from "./backends.js";
 import { TypeSafeIntegrationError } from "./errors.js";
+import { DEFAULT_LOGIN_HINT, hasLoginHint, loginHintOf } from "./hints.js";
 
 export type KeySource = "environment" | "stored";
 
@@ -67,13 +68,14 @@ function readStoredKeys(): Record<string, string> {
 /**
  * The stored key for one backend, or `undefined` when the file is missing, unreadable, or holds no usable value. Throws
  * `configuration` when the file is readable by other users; keySituation() reports that case as `unusable` instead.
+ * `loginHint` names the caller's own login command in that message; see hints.ts.
  */
-export function readStoredApiKey(backend: BackendSpec = DEFAULT_BACKEND): string | undefined {
+export function readStoredApiKey(backend: BackendSpec = DEFAULT_BACKEND, loginHint?: string): string | undefined {
   const path = credentialsPath();
   try {
     if (process.platform !== "win32" && (statSync(path).mode & 0o077) !== 0) {
       // Refuse to use a key other local users can read; the user must fix permissions or log in again.
-      throw new TypeSafeIntegrationError("configuration", `Refusing to read ${path}: it is readable by other users. Run chmod 600 on it, or run /typesafe logout and /typesafe login.`);
+      throw new TypeSafeIntegrationError("configuration", `Refusing to read ${path}: it is readable by other users. Run chmod 600 on it, or run ${loginHintOf(loginHint)}.`);
     }
     return readStoredKeys()[credentialId(backend)];
   } catch (error) {
@@ -89,14 +91,14 @@ export function readStoredApiKey(backend: BackendSpec = DEFAULT_BACKEND): string
  * `configuration` error as resolveBackend(), so validate a user-supplied endpoint with resolveBackend() first.
  * One rule for every backend: its own environment variable, then the key stored for it, then missing.
  */
-export function keySituation(backend: BackendSpec = DEFAULT_BACKEND): KeySituation {
+export function keySituation(backend: BackendSpec = DEFAULT_BACKEND, loginHint?: string): KeySituation {
   const config = resolveBackend(backend);
   const keyEnv = config.keyEnv;
   const fromEnvironment = process.env[keyEnv]?.trim();
   if (fromEnvironment) return { kind: "environment", key: fromEnvironment, keyEnv };
   const path = credentialsPath();
   try {
-    const key = readStoredApiKey(backend);
+    const key = readStoredApiKey(backend, loginHint);
     return key ? { kind: "stored", key, path } : { kind: "missing" };
   } catch (error) {
     // readStoredApiKey only throws for a store this process must not use; report it instead of failing the caller.
@@ -105,11 +107,14 @@ export function keySituation(backend: BackendSpec = DEFAULT_BACKEND): KeySituati
   }
 }
 
-/** Short phrase naming the source; full sentences stay with the caller. */
-export function keySourceLabel(situation: KeySituation): string {
+/**
+ * Short phrase naming the source; full sentences stay with the caller. A caller that names its own login command
+ * (pi-warden's `/warden enable`) gets `the key saved by` that command instead of the default command's name.
+ */
+export function keySourceLabel(situation: KeySituation, loginHint?: string): string {
   switch (situation.kind) {
     case "environment": return situation.keyEnv ?? TYPESAFE_KEY_ENV;
-    case "stored": return "/typesafe login";
+    case "stored": return hasLoginHint(loginHint) ? `the key saved by ${loginHintOf(loginHint)}` : DEFAULT_LOGIN_HINT;
     case "missing": return "no key";
     case "unusable": return "unusable key";
   }

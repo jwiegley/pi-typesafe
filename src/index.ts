@@ -19,6 +19,7 @@ export {
 export type { BlockedCap, SpendCaps, UsageLedger, UsageLedgerOptions, UsageReport, UsageTotals } from "./usage.js";
 export { TypeSafeIntegrationError } from "./errors.js";
 export type { IntegrationErrorCode } from "./errors.js";
+export { DEFAULT_LOGIN_HINT } from "./hints.js";
 export {
   DEFAULT_BACKEND_LIMITS, DEFAULT_MAX_INPUT_BYTES, DEFAULT_MAX_QUESTIONS, evaluationSchema, normalizeEvaluationRequest, parseEvaluationRequest, prepareEvaluationRequest,
 } from "./schema.js";

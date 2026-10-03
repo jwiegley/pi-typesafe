@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, statSync } from "node:fs";
+import { chmodSync, existsSync, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { storeApiKey } from "../src/credentials.js";
 import { TypeSafeIntegrationError } from "../src/errors.js";
 import { ensureApiKey, loginWithPrompt } from "../src/login.js";
 
@@ -108,5 +109,18 @@ test("another backend keeps its own key: its environment variable wins, otherwis
     assert.equal(modelListCalls, 1);
   } finally {
     if (savedOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = savedOpenRouter;
+  }
+});
+
+test("ensureApiKey names the caller's login command when the store must not be read", async () => {
+  // Every backend has a login store, so the refusal of a store other users can read is the hint ensureApiKey gives.
+  storeApiKey("ts_live_key_0123456789abcdef");
+  chmodSync(storedPath(), 0o644);
+  customResult = "ts_live_key_0123456789abcdef";
+  try {
+    await assert.rejects(ensureApiKey(ctx(), { loginHint: "/warden enable" }), (error: unknown) => error instanceof TypeSafeIntegrationError && error.code === "configuration" && /run \/warden enable/.test(error.message) && !error.message.includes("/typesafe login"));
+    assert.equal(modelListCalls, 0, "the refusal is reported instead of prompting for a key");
+  } finally {
+    chmodSync(storedPath(), 0o600);
   }
 });

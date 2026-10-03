@@ -51,11 +51,12 @@ export type EnsureApiKeyResult =
  * Use the configured key for the backend if there is one; otherwise run the login prompt. `undefined` means the user
  * cancelled. A store that must not be read throws `configuration` with the reason instead of prompting, so a
  * permissions problem stays visible; the result shape is frozen for existing callers. Every backend has a login store,
- * so the prompt proves the key against the backend it was asked for and saves it under that backend.
+ * so the prompt proves the key against the backend it was asked for and saves it under that backend. `loginHint` names
+ * the caller's own login command in the reason a store that must not be read gives; see hints.ts.
  */
-export async function ensureApiKey(ctx: ExtensionCommandContext, options: { backend?: BackendSpec } = {}): Promise<EnsureApiKeyResult | undefined> {
+export async function ensureApiKey(ctx: ExtensionCommandContext, options: { backend?: BackendSpec; loginHint?: string } = {}): Promise<EnsureApiKeyResult | undefined> {
   const backend = options.backend ?? DEFAULT_BACKEND;
-  const situation = keySituation(backend);
+  const situation = keySituation(backend, options.loginHint);
   if (situation.kind === "environment" || situation.kind === "stored") return { source: situation.kind };
   if (situation.kind === "unusable") throw new TypeSafeIntegrationError("configuration", situation.reason);
   const login = await loginWithPrompt(ctx, { backend });
