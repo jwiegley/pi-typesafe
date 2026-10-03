@@ -497,3 +497,16 @@ test("key resolution picks the right env var per backend", () => {
     if (originalOR === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = originalOR;
   }
 });
+
+test("loginHint names the caller's login command and changes no key handling", () => {
+  const savedDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = mkdtempSync(join(tmpdir(), "pi-typesafe-hint-"));
+  try {
+    assert.throws(() => createTypeSafe({ loginHint: "/warden enable" }), (error: unknown) => error instanceof TypeSafeIntegrationError && error.code === "configuration" && /Run \/warden enable in Pi/.test(error.message) && !error.message.includes("/typesafe login"));
+    assert.throws(() => createTypeSafe({}), (error: unknown) => error instanceof TypeSafeIntegrationError && /Run \/typesafe login in Pi/.test(error.message));
+    // A hint is text only: it names no key, so the same call still refuses without one.
+    assert.throws(() => createTypeSafe({ loginHint: "/warden enable", fetch: async () => Response.json({}) }), hasCode("configuration"));
+  } finally {
+    if (savedDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = savedDir;
+  }
+});

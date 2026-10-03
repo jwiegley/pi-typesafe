@@ -7,6 +7,7 @@ import type { BatchEvaluation, BatchOptions } from "./batch.js";
 import { evaluateAll, evaluateMany } from "./batch.js";
 import { keySituation } from "./credentials.js";
 import { TypeSafeIntegrationError, safeError } from "./errors.js";
+import { loginHintOf } from "./hints.js";
 import { DEFAULT_MAX_INPUT_BYTES, assertWithinByteLimit, prepareEvaluationRequest } from "./schema.js";
 import { DEFAULT_USD_PER_MTOK, capsFromEnvironment, estimateUsd, mergeCaps, openUsageLedger } from "./usage.js";
 import type { BlockedCap, SpendCaps, UsageLedger, UsageReport } from "./usage.js";
@@ -65,6 +66,8 @@ export interface TypeSafeOptions {
   backend?: BackendSpec;
   /** Defaults to the backend's own default (`jev-latest`, `typesafe/jev-1.13` on OpenRouter); a bare Jev id is mapped to the backend's id form before sending. No model is inferred from submitted content. */
   model?: string;
+  /** How messages name the command that logs in. Defaults to `/typesafe login`, the command this package's own extension registers; an embedder with its own login command (pi-warden's `/warden enable`) passes it here. Text only: it changes no key handling. */
+  loginHint?: string;
   /** Per request. Default: 15 seconds. No automatic retries. */
   timeoutMs?: number;
   /** UTF-8 JSON bytes, including model/questions. Default: 64 KiB. Not a token limit. */
@@ -196,12 +199,12 @@ export function createTypeSafe(options: TypeSafeOptions = {}): TypeSafe {
 
   if (!apiKey) {
     // The same resolution that authState() and ensureApiKey() report, so the status line and the request agree.
-    const situation = keySituation(options.backend);
+    const situation = keySituation(options.backend, options.loginHint);
     if (situation.kind === "unusable") throw new TypeSafeIntegrationError("configuration", situation.reason);
     if (situation.kind === "environment" || situation.kind === "stored") apiKey = situation.key;
   }
   if (!apiKey) {
-    const how = usesTypesafeKey(backend) ? `Run /typesafe login in Pi, or set ${TYPESAFE_KEY_ENV}` : `Set ${backend.keyEnv}`;
+    const how = usesTypesafeKey(backend) ? `Run ${loginHintOf(options.loginHint)} in Pi, or set ${TYPESAFE_KEY_ENV}` : `Set ${backend.keyEnv}`;
     throw new TypeSafeIntegrationError("configuration", `No API key. ${how} in the environment.`);
   }
   const timeout = positiveInteger(options.timeoutMs ?? 15_000, "timeoutMs");

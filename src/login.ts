@@ -6,6 +6,7 @@ import { keySituation, normalizeApiKey, storeApiKey } from "./credentials.js";
 import type { KeySource } from "./credentials.js";
 import { TypeSafeIntegrationError } from "./errors.js";
 import { promptForApiKey } from "./key-prompt.js";
+import { loginHintOf } from "./hints.js";
 
 export interface LoginResult {
   /** Where the verified key was saved. */
@@ -44,16 +45,17 @@ export type EnsureApiKeyResult =
  * cancelled. A store that must not be read throws `configuration` with the reason instead of prompting, so a
  * permissions problem stays visible; the result shape is frozen for existing callers. A backend without a login store
  * (every backend except TypeSafe) throws `configuration` naming its environment variable instead of prompting, because
- * the prompt would verify the key against the wrong service and store it where the TypeSafe key lives.
+ * the prompt would verify the key against the wrong service and store it where the TypeSafe key lives. `loginHint` names
+ * the caller's own login command in that message; see hints.ts.
  */
-export async function ensureApiKey(ctx: ExtensionCommandContext, options: { backend?: BackendSpec } = {}): Promise<EnsureApiKeyResult | undefined> {
+export async function ensureApiKey(ctx: ExtensionCommandContext, options: { backend?: BackendSpec; loginHint?: string } = {}): Promise<EnsureApiKeyResult | undefined> {
   const backend = options.backend ?? DEFAULT_BACKEND;
-  const situation = keySituation(backend);
+  const situation = keySituation(backend, options.loginHint);
   if (situation.kind === "environment" || situation.kind === "stored") return { source: situation.kind };
   if (situation.kind === "unusable") throw new TypeSafeIntegrationError("configuration", situation.reason);
   const config = resolveBackend(backend);
   if (!usesTypesafeKey(config)) {
-    throw new TypeSafeIntegrationError("configuration", `No ${config.label} key. Set ${config.keyEnv} in the environment; /typesafe login stores a TypeSafe key only.`);
+    throw new TypeSafeIntegrationError("configuration", `No ${config.label} key. Set ${config.keyEnv} in the environment; ${loginHintOf(options.loginHint)} stores a TypeSafe key only.`);
   }
   const login = await loginWithPrompt(ctx);
   return login ? { source: "stored", login } : undefined;

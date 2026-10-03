@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { authState, authStatePath, clearAuthState, describeAuth, recordAuthFailure, recordAuthVerified } from "../src/auth.js";
-import { credentialsPath, storeApiKey } from "../src/credentials.js";
+import { clearStoredApiKey, credentialsPath, storeApiKey } from "../src/credentials.js";
 import { TypeSafeIntegrationError } from "../src/errors.js";
 
 const workspace = mkdtempSync(join(tmpdir(), "pi-typesafe-auth-"));
@@ -138,4 +138,28 @@ test("a corrupt auth record is ignored and clearing forgets both facts", () => {
   const cleared = authState();
   assert.equal(cleared.verified, false);
   assert.equal(cleared.lastFailure, undefined);
+});
+
+test("a caller's login hint reaches the status line and the stored-key label", () => {
+  // Earlier tests leave a stored key behind; start from a known empty state.
+  clearStoredApiKey();
+  clearAuthState();
+  const missing = authState({ backend: "typesafe", loginHint: "/warden enable" });
+  assert.equal(missing.keyName, "no key");
+  const report = describeAuth(missing, "/warden enable");
+  assert.equal(report.level, "error");
+  assert.ok(report.text.includes("/warden enable or TYPESAFE_API_KEY"));
+  assert.ok(!report.text.includes("/typesafe login"));
+  // The default is unchanged for every caller that names no command.
+  assert.ok(describeAuth(authState({ backend: "typesafe" })).text.includes("/typesafe login or TYPESAFE_API_KEY"));
+
+  storeApiKey("stored-key-0123456789abcdef");
+  try {
+    assert.equal(authState({ loginHint: "/warden enable" }).keyName, "the key saved by /warden enable");
+    assert.equal(describeAuth(authState({ loginHint: "/warden enable" }), "/warden enable").text.includes("the key saved by /warden enable"), true);
+    assert.equal(authState().keyName, "/typesafe login");
+    assert.equal(describeAuth(authState()).text.includes("/typesafe login"), true);
+  } finally {
+    clearStoredApiKey();
+  }
 });

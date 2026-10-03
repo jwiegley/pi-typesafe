@@ -142,3 +142,24 @@ test("keySourceLabel names each source", () => {
   assert.equal(keySourceLabel({ kind: "missing" }), "no key");
   assert.equal(keySourceLabel({ kind: "unusable", path: "/tmp/auth.json", reason: "r" }), "unusable key");
 });
+
+test("a caller's login hint replaces the default command name in messages", () => {
+  const stored = { kind: "stored", key: "k", path: "/tmp/auth.json" } as const;
+  assert.equal(keySourceLabel(stored, "/warden enable"), "the key saved by /warden enable");
+  assert.equal(keySourceLabel(stored, "   "), "/typesafe login", "a blank hint is no hint");
+  assert.equal(keySourceLabel(stored, "/warden enable"), keySourceLabel(stored, " /warden enable "), "the hint is trimmed");
+
+  // The permission refusal names the caller's command too, so an embedder's operator is not sent to a command it does not register.
+  storeApiKey(validKey);
+  chmodSync(credentialsPath(), 0o644);
+  try {
+    assert.throws(() => readStoredApiKey("/warden enable"), (error: unknown) => error instanceof TypeSafeIntegrationError && error.message.includes("run /warden enable") && !error.message.includes("/typesafe login"));
+    const situation = keySituation("typesafe", "/warden enable");
+    assert.ok(situation.kind === "unusable");
+    assert.match(situation.reason, /run \/warden enable/);
+    assert.doesNotMatch(situation.reason, /\/typesafe login/);
+  } finally {
+    chmodSync(credentialsPath(), 0o600);
+    clearStoredApiKey();
+  }
+});

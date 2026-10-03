@@ -5,6 +5,7 @@ import type { BackendSpec } from "./backends.js";
 import { credentialsPath, keySituation, keySourceLabel, piTypesafeDir } from "./credentials.js";
 import type { KeySource } from "./credentials.js";
 import { TypeSafeIntegrationError } from "./errors.js";
+import { loginHintOf } from "./hints.js";
 import type { IntegrationErrorCode } from "./errors.js";
 
 const AUTH_VERSION = 1;
@@ -92,12 +93,12 @@ function writeState(path: string, state: { verifiedAt?: string; lastFailure?: Au
 /**
  * What the key situation, the last outcome, and the clock add up to for a valid backend; it never throws for one. An
  * invalid backend throws the same `configuration` error as resolveBackend(), so validate a user-supplied endpoint
- * with resolveBackend() first.
+ * with resolveBackend() first. `loginHint` names the caller's own login command in the key-source label; see hints.ts.
  */
-export function authState(options: { path?: string; backend?: BackendSpec } = {}): AuthState {
+export function authState(options: { path?: string; backend?: BackendSpec; loginHint?: string } = {}): AuthState {
   const path = options.path ?? authStatePath();
   const backend = options.backend ?? DEFAULT_BACKEND;
-  const situation = keySituation(backend);
+  const situation = keySituation(backend, options.loginHint);
   const stored = readState(path);
   const source: KeySource | undefined = situation.kind === "environment" ? "environment" : situation.kind === "stored" ? "stored" : undefined;
   const rejected = stored.lastFailure?.code === "http" && stored.lastFailure.status !== undefined && REJECTED_STATUSES.has(stored.lastFailure.status);
@@ -108,7 +109,7 @@ export function authState(options: { path?: string; backend?: BackendSpec } = {}
     ...(source === undefined ? {} : { source }),
     path: situation.kind === "unusable" ? situation.path : credentialsPath(),
     ...(situation.kind === "unusable" ? { reason: situation.reason } : {}),
-    keyName: keySourceLabel(situation),
+    keyName: keySourceLabel(situation, options.loginHint),
     verified: stored.verifiedAt !== undefined && !rejected,
     ...(stored.verifiedAt === undefined ? {} : { verifiedAt: stored.verifiedAt }),
     ...(stored.lastFailure === undefined ? {} : { lastFailure: stored.lastFailure }),
@@ -147,14 +148,14 @@ export interface AuthReport {
 
 /**
  * One line plus a level, so a status command, a headless log, or a consumer's own status line can call out a degraded
- * state instead of reporting "enabled".
+ * state instead of reporting "enabled". `loginHint` names the caller's own login command; see hints.ts.
  */
-export function describeAuth(state: AuthState = authState()): AuthReport {
+export function describeAuth(state: AuthState = authState(), loginHint?: string): AuthReport {
   const config = resolveBackend(state.backend);
   const label = `${config.label} key`;
   const since = state.lastFailure ? ` Last failure: ${state.lastFailure.message}${state.lastFailure.at ? ` (${state.lastFailure.at})` : ""}` : "";
   if (state.kind === "missing") {
-    const how = usesTypesafeKey(config) ? `a key is configured (/typesafe login or ${TYPESAFE_KEY_ENV})` : `${config.keyEnv} is set in the environment`;
+    const how = usesTypesafeKey(config) ? `a key is configured (${loginHintOf(loginHint)} or ${TYPESAFE_KEY_ENV})` : `${config.keyEnv} is set in the environment`;
     return { level: "error", text: `${label}: missing — every Jev judgment is skipped until ${how}.${since}` };
   }
   if (state.kind === "unusable") {

@@ -99,3 +99,13 @@ test("ensureApiKey for another backend uses its environment variable and never o
     if (savedOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = savedOpenRouter;
   }
 });
+
+test("ensureApiKey names the caller's login command for a backend with no login store", async () => {
+  const savedOpenRouter = process.env.OPENROUTER_API_KEY;
+  try {
+    delete process.env.OPENROUTER_API_KEY;
+    await assert.rejects(ensureApiKey(ctx(), { backend: "openrouter", loginHint: "/warden enable" }), (error: unknown) => error instanceof TypeSafeIntegrationError && error.code === "configuration" && /\/warden enable stores a TypeSafe key only/.test(error.message) && !error.message.includes("/typesafe login"));
+  } finally {
+    if (savedOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = savedOpenRouter;
+  }
+});
