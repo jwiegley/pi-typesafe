@@ -402,7 +402,7 @@ test("a public model list leaves the auth state unverified", async () => {
 
 test("the model in the request body is the backend's own id form", async () => {
   const cases = [
-    ["openrouter", undefined, "~typesafe/jev-latest"],
+    ["openrouter", undefined, "typesafe/jev-1.13"],
     ["openrouter", "jev-latest", "~typesafe/jev-latest"],
     ["openrouter", "jev-1.13", "typesafe/jev-1.13"],
     ["openrouter", "jev-1.13.0", "typesafe/jev-1.13"],
