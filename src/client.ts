@@ -65,7 +65,7 @@ export interface TypeSafeOptions {
   apiKey?: string;
   /** Judgment backend: a registry name or a caller-supplied endpoint. When omitted, routes to the default TypeSafe host. */
   backend?: BackendSpec;
-  /** Defaults to the backend's own default: `jev-latest` on TypeSafe and OpenRouter (OpenRouter's own alias form is `~typesafe/jev-latest`), `typesafe/jev` on Command Code, `d1:free` on Liquid; a bare Jev id is mapped to the backend's id form before sending. No model is inferred from submitted content. */
+  /** Defaults to the backend's own default (`jev-latest`, `typesafe/jev-1.13` on OpenRouter); a bare Jev id is mapped to the backend's id form before sending. No model is inferred from submitted content. */
   model?: string;
   /** How messages name the command that logs in. Defaults to `/typesafe login`, the command this package's own extension registers; an embedder with its own login command (pi-warden's `/warden enable`) passes it here. Text only: it changes no key handling. */
   loginHint?: string;
