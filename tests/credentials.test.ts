@@ -200,6 +200,11 @@ test("a caller's login hint replaces the default command name in messages", () =
     assert.ok(situation.kind === "unusable");
     assert.match(situation.reason, /run \/warden enable/);
     assert.doesNotMatch(situation.reason, /\/typesafe login/);
+    // The caller's command comes after chmod, never as the alternative to it: /warden enable reaches this same refusal.
+    assert.ok(situation.reason.endsWith("Run chmod 600 on it, then run /warden enable again."), situation.reason);
+    // With no hint the refusal is the default's own, word for word: logging out and in again rewrites the file.
+    assert.throws(() => readStoredApiKey(), (error: unknown) => error instanceof TypeSafeIntegrationError
+      && error.message === `Refusing to read ${credentialsPath()}: it is readable by other users. Run chmod 600 on it, or run /typesafe logout and /typesafe login.`);
   } finally {
     chmodSync(credentialsPath(), 0o600);
     clearStoredApiKey();

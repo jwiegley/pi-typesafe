@@ -118,8 +118,14 @@ test("ensureApiKey names the caller's login command when the store must not be r
   chmodSync(storedPath(), 0o644);
   customResult = "ts_live_key_0123456789abcdef";
   try {
-    await assert.rejects(ensureApiKey(ctx(), { loginHint: "/warden enable" }), (error: unknown) => error instanceof TypeSafeIntegrationError && error.code === "configuration" && /run \/warden enable/.test(error.message) && !error.message.includes("/typesafe login"));
+    // The caller's command cannot get past this refusal, so the message puts it after chmod instead of offering it in its place.
+    await assert.rejects(ensureApiKey(ctx(), { loginHint: "/warden enable" }), (error: unknown) => error instanceof TypeSafeIntegrationError && error.code === "configuration"
+      && /Run chmod 600 on it, then run \/warden enable again\.$/.test(error.message) && !error.message.includes("/typesafe login"));
     assert.equal(modelListCalls, 0, "the refusal is reported instead of prompting for a key");
+    // Following the advice works: once the file is owner-only, the same call uses the stored key without prompting.
+    chmodSync(storedPath(), 0o600);
+    assert.deepEqual(await ensureApiKey(ctx(), { loginHint: "/warden enable" }), { source: "stored" });
+    assert.equal(modelListCalls, 0);
   } finally {
     chmodSync(storedPath(), 0o600);
   }

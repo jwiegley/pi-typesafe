@@ -68,14 +68,17 @@ function readStoredKeys(): Record<string, string> {
 /**
  * The stored key for one backend, or `undefined` when the file is missing, unreadable, or holds no usable value. Throws
  * `configuration` when the file is readable by other users; keySituation() reports that case as `unusable` instead.
- * `loginHint` names the caller's own login command in that message; see hints.ts.
+ * `loginHint` names the caller's own login command in that message, as the step after chmod; see hints.ts.
  */
 export function readStoredApiKey(backend: BackendSpec = DEFAULT_BACKEND, loginHint?: string): string | undefined {
   const path = credentialsPath();
   try {
     if (process.platform !== "win32" && (statSync(path).mode & 0o077) !== 0) {
-      // Refuse to use a key other local users can read; the user must fix permissions or log in again.
-      throw new TypeSafeIntegrationError("configuration", `Refusing to read ${path}: it is readable by other users. Run chmod 600 on it, or run ${loginHintOf(loginHint)}.`);
+      // Refuse to use a key other local users can read; the user must fix permissions or log in again. `/typesafe login`
+      // never makes this check and rewrites the file owner-only. A caller's own command may reach this same refusal
+      // before it prompts, as pi-warden's `/warden enable` does through ensureApiKey, so it follows chmod instead.
+      const fix = hasLoginHint(loginHint) ? `then run ${loginHintOf(loginHint)} again` : "or run /typesafe logout and /typesafe login";
+      throw new TypeSafeIntegrationError("configuration", `Refusing to read ${path}: it is readable by other users. Run chmod 600 on it, ${fix}.`);
     }
     return readStoredKeys()[credentialId(backend)];
   } catch (error) {
